@@ -1,0 +1,45 @@
+name: Sigil
+options:
+  bundleIdPrefix: com.sigil
+  deploymentTarget:
+    macOS: "15.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+
+targets:
+  Sigil:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sigil
+        excludes:
+          - "Info.plist"
+          - "Resources/Icons/**"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sigil.app
+        CODE_SIGN_ENTITLEMENTS: Sigil/Sigil.entitlements
+        PRODUCT_NAME: Sigil
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        COMBINE_HIDPI_IMAGES: true
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/../Frameworks"
+    preBuildScripts:
+      - name: Copy Icon Assets
+        script: |
+          mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/Icons"
+          cp -R "${SRCROOT}/Sigil/Resources/Icons/" "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Resources/Icons/"
+        basedOnDependencyAnalysis: false
+    info:
+      path: Sigil/Info.plist
+      properties:
+        LSUIElement: true
+        NSHighResolutionCapable: true
+        CFBundleDisplayName: Sigil
+        NSSupportsAutomaticTermination: true
+        NSSupportsSuddenTermination: true

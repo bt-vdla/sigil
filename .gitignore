@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+DerivedData/
+build/
+*.moved-aside
+*.xcuserstate
+*.xcbkptlist
+
+# Archives & exports
+*.xcarchive
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# DMG / release artifacts
+dist/
+*.dmg
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Environment / secrets
+.env
+.env.*
+*.key
+*.pem
+secrets/
+
+# Editor
+.cursor/
+.vscode/
+*.swp
+*.swo
