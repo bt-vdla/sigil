@@ -35,14 +35,29 @@ mkdir -p "$BUILD_DIR"
 
 # ── Archive ───────────────────────────────────────────────────────────────────
 echo "🔨  Archiving $SCHEME ($CONFIGURATION)…"
-xcodebuild archive \
-  -project "$PROJECT_ROOT/Sigil.xcodeproj" \
-  -scheme "$SCHEME" \
-  -configuration "$CONFIGURATION" \
-  -archivePath "$ARCHIVE_PATH" \
-  -derivedDataPath "$DERIVED_DATA" \
-  CODE_SIGN_STYLE=Automatic \
-  | xcpretty 2>/dev/null || true   # xcpretty is optional; raw output still appears
+
+if $UNSIGNED; then
+  # Ad-hoc signing — no Developer ID required
+  xcodebuild archive \
+    -project "$PROJECT_ROOT/Sigil.xcodeproj" \
+    -scheme "$SCHEME" \
+    -configuration "$CONFIGURATION" \
+    -archivePath "$ARCHIVE_PATH" \
+    -derivedDataPath "$DERIVED_DATA" \
+    CODE_SIGN_STYLE=Manual \
+    CODE_SIGN_IDENTITY="" \
+    | xcpretty 2>/dev/null || true
+else
+  # Automatic signing with Developer ID
+  xcodebuild archive \
+    -project "$PROJECT_ROOT/Sigil.xcodeproj" \
+    -scheme "$SCHEME" \
+    -configuration "$CONFIGURATION" \
+    -archivePath "$ARCHIVE_PATH" \
+    -derivedDataPath "$DERIVED_DATA" \
+    CODE_SIGN_STYLE=Automatic \
+    | xcpretty 2>/dev/null || true
+fi
 
 # ── Export ────────────────────────────────────────────────────────────────────
 echo "📦  Exporting archive…"

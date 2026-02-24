@@ -25,18 +25,6 @@
       "size" : "32x32"
     },
     {
-      "filename" : "AppIcon-64@1x.png",
-      "idiom" : "mac",
-      "scale" : "1x",
-      "size" : "64x64"
-    },
-    {
-      "filename" : "AppIcon-64@2x.png",
-      "idiom" : "mac",
-      "scale" : "2x",
-      "size" : "64x64"
-    },
-    {
       "filename" : "AppIcon-128@1x.png",
       "idiom" : "mac",
       "scale" : "1x",
@@ -76,8 +64,5 @@
   "info" : {
     "author" : "xcode",
     "version" : 1
-  },
-  "properties" : {
-    "pre-rendered" : false
   }
 }
