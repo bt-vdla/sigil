@@ -44,10 +44,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         guard let button = statusItem.button else { return }
 
-        // Use the custom Sigil icon from Assets
+        // Try to use the custom Sigil icon from Assets
         if let image = NSImage(named: "SigilIcon") {
             image.isTemplate = true  // Template so it respects system appearance
             button.image = image
+            print("[Sigil] ✅ Loaded custom SigilIcon from Assets")
+        } else {
+            // Fallback: use system seal icon if custom icon isn't found
+            print("[Sigil] ⚠️  SigilIcon not found in Assets, using system icon")
+            let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+            if let image = NSImage(systemSymbolName: "seal", accessibilityDescription: "Sigil") {
+                button.image = image.withSymbolConfiguration(config)
+            }
         }
 
         button.action = #selector(handleStatusItemClick(_:))

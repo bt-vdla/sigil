@@ -21,6 +21,9 @@ targets:
         excludes:
           - "Info.plist"
           - "Resources/Icons/**"
+    resources:
+      - path: Sigil/Assets.xcassets
+      - path: Sigil/Resources/Icons
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sigil.app

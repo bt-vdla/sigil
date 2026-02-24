@@ -28,7 +28,5 @@
 	<true/>
 	<key>NSSupportsSuddenTermination</key>
 	<true/>
-	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2025 The BT Std. All rights reserved.</string>
 </dict>
 </plist>
