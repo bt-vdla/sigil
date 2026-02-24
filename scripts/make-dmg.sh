@@ -107,17 +107,21 @@ fi
 echo "💿  Creating DMG…"
 
 if command -v create-dmg &>/dev/null; then
-  # Polished DMG with custom layout (brew install create-dmg)
-  create-dmg \
-    --volname "Sigil" \
-    --window-pos 200 120 \
-    --window-size 540 380 \
-    --icon-size 128 \
-    --icon "$APP_NAME" 130 190 \
-    --hide-extension "$APP_NAME" \
-    --app-drop-link 400 190 \
-    "$DMG_PATH" \
-    "$APP_PATH"
+  # Polished DMG with automatic layout (brew install create-dmg)
+  # Sindre Sorhus version - creates beautiful DMG automatically
+  DMG_ARGS=(
+    --overwrite
+    --dmg-title "Sigil"
+  )
+
+  if $UNSIGNED; then
+    DMG_ARGS+=(--no-code-sign)
+  fi
+
+  create-dmg "${DMG_ARGS[@]}" "$APP_PATH" "$BUILD_DIR"
+
+  # Rename to expected filename
+  mv "$BUILD_DIR/Sigil.dmg" "$DMG_PATH" 2>/dev/null || true
 else
   # Fallback: plain DMG via hdiutil
   STAGING="$BUILD_DIR/dmg-staging"
