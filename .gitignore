@@ -20,10 +20,6 @@ build/
 *.dSYM.zip
 *.dSYM
 
-# DMG / release artifacts
-# dist/ — tracked for releases
-# *.dmg — DMGs are large but we keep them for distribution
-
 # Swift Package Manager
 .build/
 .swiftpm/

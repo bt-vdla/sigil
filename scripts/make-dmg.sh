@@ -1,82 +1,48 @@
 #!/usr/bin/env bash
-# scripts/make-dmg.sh — Build Sigil.app (Release) and package it into a DMG.
+# scripts/make-dmg.sh — Build Sigil.app (Release) and write Sigil.dmg to the repo root.
 #
-# Prerequisites:
-#   • Xcode command-line tools (xcodebuild must be on PATH)
-#   • Development Team set in Xcode, or pass TEAM_ID below for ad-hoc builds
-#   • Optional: brew install create-dmg  (for a polished DMG with background)
+# Needs Xcode. Uses create-dmg (npm i -g create-dmg) for the polished layout when
+# it's installed, and falls back to a plain hdiutil image.
 #
 # Usage:
-#   ./scripts/make-dmg.sh              # default — uses signing identity from Xcode
-#   ./scripts/make-dmg.sh --unsigned   # skip code signing (for local testing only)
+#   ./scripts/make-dmg.sh             # Developer ID signed; needs that certificate
+#   ./scripts/make-dmg.sh --unsigned  # ad-hoc signed; Gatekeeper warns on other Macs
 
 set -euo pipefail
 
-# ── Configuration ────────────────────────────────────────────────────────────
 SCHEME="Sigil"
-CONFIGURATION="Release"
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUILD_DIR="$PROJECT_ROOT/dist"
-DERIVED_DATA="$BUILD_DIR/DerivedData"
+# Outside the repo: iCloud-synced folders add attributes that make code signing fail
+BUILD_DIR="$(mktemp -d)"
+trap 'rm -rf "$BUILD_DIR"' EXIT
 ARCHIVE_PATH="$BUILD_DIR/Sigil.xcarchive"
 EXPORT_PATH="$BUILD_DIR/export"
-DMG_PATH="$BUILD_DIR/Sigil.dmg"
-APP_NAME="Sigil.app"
+DMG_PATH="$PROJECT_ROOT/Sigil.dmg"
 
 UNSIGNED=false
 for arg in "$@"; do
   [[ "$arg" == "--unsigned" ]] && UNSIGNED=true
 done
 
-# ── Clean previous artifacts ──────────────────────────────────────────────────
-echo "🧹  Cleaning dist/…"
-rm -rf "$BUILD_DIR"
-mkdir -p "$BUILD_DIR"
+mkdir -p "$EXPORT_PATH"
 
-# ── Archive ───────────────────────────────────────────────────────────────────
-echo "🔨  Archiving $SCHEME ($CONFIGURATION)…"
-
+echo "Archiving $SCHEME…"
+SIGNING=(CODE_SIGN_STYLE=Automatic)
 if $UNSIGNED; then
-  # Ad-hoc signing — no Developer ID required
-  xcodebuild archive \
-    -project "$PROJECT_ROOT/Sigil.xcodeproj" \
-    -scheme "$SCHEME" \
-    -configuration "$CONFIGURATION" \
-    -archivePath "$ARCHIVE_PATH" \
-    -derivedDataPath "$DERIVED_DATA" \
-    CODE_SIGN_STYLE=Manual \
-    CODE_SIGN_IDENTITY="" \
-    | xcpretty 2>/dev/null || true
-else
-  # Automatic signing with Developer ID
-  xcodebuild archive \
-    -project "$PROJECT_ROOT/Sigil.xcodeproj" \
-    -scheme "$SCHEME" \
-    -configuration "$CONFIGURATION" \
-    -archivePath "$ARCHIVE_PATH" \
-    -derivedDataPath "$DERIVED_DATA" \
-    CODE_SIGN_STYLE=Automatic \
-    | xcpretty 2>/dev/null || true
+  SIGNING=(CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=)
 fi
-
-# ── Export ────────────────────────────────────────────────────────────────────
-echo "📦  Exporting archive…"
+xcodebuild archive \
+  -project "$PROJECT_ROOT/Sigil.xcodeproj" \
+  -scheme "$SCHEME" \
+  -configuration Release \
+  -archivePath "$ARCHIVE_PATH" \
+  -derivedDataPath "$BUILD_DIR/DerivedData" \
+  -quiet \
+  "${SIGNING[@]}"
 
 if $UNSIGNED; then
-  # Ad-hoc export — no Developer ID required; Gatekeeper will block on other Macs
-  cat > "$BUILD_DIR/ExportOptions.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key><string>mac-application</string>
-    <key>signingStyle</key><string>manual</string>
-    <key>stripSwiftSymbols</key><true/>
-</dict>
-</plist>
-PLIST
+  cp -R "$ARCHIVE_PATH/Products/Applications/Sigil.app" "$EXPORT_PATH/"
 else
-  # Developer ID export — requires Apple Developer account + Developer ID cert
   cat > "$BUILD_DIR/ExportOptions.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -84,69 +50,35 @@ else
 <dict>
     <key>method</key><string>developer-id</string>
     <key>signingStyle</key><string>automatic</string>
-    <key>stripSwiftSymbols</key><true/>
 </dict>
 </plist>
 PLIST
+  xcodebuild -exportArchive \
+    -archivePath "$ARCHIVE_PATH" \
+    -exportPath "$EXPORT_PATH" \
+    -exportOptionsPlist "$BUILD_DIR/ExportOptions.plist" \
+    -quiet
 fi
 
-xcodebuild -exportArchive \
-  -archivePath "$ARCHIVE_PATH" \
-  -exportPath "$EXPORT_PATH" \
-  -exportOptionsPlist "$BUILD_DIR/ExportOptions.plist" \
-  | xcpretty 2>/dev/null || true
+APP_PATH="$EXPORT_PATH/Sigil.app"
+rm -f "$DMG_PATH"
 
-APP_PATH="$EXPORT_PATH/$APP_NAME"
-
-if [[ ! -d "$APP_PATH" ]]; then
-  echo "❌  Export failed — $APP_PATH not found"
-  exit 1
-fi
-
-# ── Create DMG ────────────────────────────────────────────────────────────────
-echo "💿  Creating DMG…"
-
+echo "Creating DMG…"
 if command -v create-dmg &>/dev/null; then
-  # Polished DMG with automatic layout (brew install create-dmg)
-  # Sindre Sorhus version - creates beautiful DMG automatically
-  DMG_ARGS=(
-    --overwrite
-    --dmg-title "Sigil"
-  )
-
-  if $UNSIGNED; then
-    DMG_ARGS+=(--no-code-sign)
-  fi
-
-  create-dmg "${DMG_ARGS[@]}" "$APP_PATH" "$BUILD_DIR"
-
-  # Rename to expected filename
-  mv "$BUILD_DIR/Sigil.dmg" "$DMG_PATH" 2>/dev/null || true
+  DMG_ARGS=(--overwrite --dmg-title "Sigil")
+  $UNSIGNED && DMG_ARGS+=(--no-code-sign)
+  # create-dmg can exit non-zero over signing alone, so check for the image instead
+  create-dmg "${DMG_ARGS[@]}" "$APP_PATH" "$BUILD_DIR" || true
+  mv "$BUILD_DIR"/Sigil*.dmg "$DMG_PATH"
 else
-  # Fallback: plain DMG via hdiutil
   STAGING="$BUILD_DIR/dmg-staging"
   mkdir -p "$STAGING"
   cp -R "$APP_PATH" "$STAGING/"
-  ln -sf /Applications "$STAGING/Applications"
-
-  hdiutil create \
-    -volname "Sigil" \
-    -srcfolder "$STAGING" \
-    -ov \
-    -format UDZO \
-    "$DMG_PATH"
-
-  rm -rf "$STAGING"
+  ln -s /Applications "$STAGING/Applications"
+  hdiutil create -volname "Sigil" -srcfolder "$STAGING" -ov -format UDZO "$DMG_PATH"
 fi
 
-# ── Done ──────────────────────────────────────────────────────────────────────
-echo ""
-echo "✅  Done! DMG at:"
-echo "    $DMG_PATH"
-echo ""
-
+echo "Done: $DMG_PATH"
 if $UNSIGNED; then
-  echo "⚠️  Built without Developer ID signing."
-  echo "   Gatekeeper will block this on other Macs."
-  echo "   For distribution, set up a Developer ID cert and run without --unsigned."
+  echo "Ad-hoc signed: Gatekeeper asks people to approve it in System Settings the first time."
 fi
