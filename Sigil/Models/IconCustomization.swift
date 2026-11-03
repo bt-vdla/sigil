@@ -4,9 +4,11 @@ import SwiftUI
 /// Applied as SVG string transforms before copy/render.
 @Observable
 final class IconCustomization {
-    var strokeWidth: Double = 2.0       // Default for most icon packs
-    var color: Color = .white           // currentColor replacement
-    var isCustomized: Bool = false      // True when user has changed any setting
+    static let defaultStrokeWidth = 2.0
+
+    var strokeWidth: Double = defaultStrokeWidth
+    var color: Color? = nil             // nil keeps currentColor
+    var isCustomized: Bool { color != nil || strokeWidth != Self.defaultStrokeWidth }
 
     // Predefined color palette for quick selection
     static let presetColors: [Color] = [
@@ -28,9 +30,11 @@ final class IconCustomization {
 
         var result = svgString
 
-        // Replace color: currentColor → hex value
-        let hexColor = color.hexString
-        result = result.replacingOccurrences(of: "currentColor", with: hexColor)
+        if let color {
+            result = result.replacingOccurrences(of: "currentColor", with: color.hexString)
+        }
+
+        guard strokeWidth != Self.defaultStrokeWidth else { return result }
 
         // Replace stroke-width with regex-like approach
         // Matches: stroke-width="<number>" (handles integers and decimals)
@@ -53,9 +57,8 @@ final class IconCustomization {
     }
 
     func reset() {
-        strokeWidth = 2.0
-        color = .white
-        isCustomized = false
+        strokeWidth = Self.defaultStrokeWidth
+        color = nil
     }
 }
 

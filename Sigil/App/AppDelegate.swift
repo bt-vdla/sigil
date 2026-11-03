@@ -1,14 +1,14 @@
 import AppKit
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
-    private let popover = NSPopover()
 
     private let iconStore = IconStore()
     private let customPackStore = CustomPackStore()
+    private let shelf = IconShelf()
+    private var drawer: DrawerController!
 
-    private var eventMonitor: Any?
     private var settingsWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -31,11 +31,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             Task { await iconStore.loadCustomPack(pack, svgDirectory: dir) }
         }
 
+        let drawerState = DrawerState()
+        drawer = DrawerController(state: drawerState) {
+            ContentView(iconStore: iconStore, customPackStore: customPackStore, shelf: shelf, drawer: drawerState)
+        }
+        drawerState.openSettings = { [weak self] in self?.openSettings() }
+        registerHotKey(HotKey.Shortcut.saved)
+
         setupStatusItem()
-        setupPopover()
-        setupGlobalEventMonitor()
 
         Task { await iconStore.loadIcons() }
+    }
+
+    @discardableResult
+    private func registerHotKey(_ shortcut: HotKey.Shortcut) -> Bool {
+        HotKey.register(shortcut) { [weak self] in self?.drawer.toggle() }
     }
 
     // MARK: - Status Item
@@ -44,18 +54,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         guard let button = statusItem.button else { return }
 
-        // Try to use the custom Sigil icon from Assets
         if let image = NSImage(named: "SigilIcon") {
             image.isTemplate = true  // Template so it respects system appearance
             button.image = image
-            print("[Sigil] ✅ Loaded custom SigilIcon from Assets")
         } else {
-            // Fallback: use system seal icon if custom icon isn't found
-            print("[Sigil] ⚠️  SigilIcon not found in Assets, using system icon")
             let config = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
-            if let image = NSImage(systemSymbolName: "seal", accessibilityDescription: "Sigil") {
-                button.image = image.withSymbolConfiguration(config)
-            }
+            button.image = NSImage(systemSymbolName: "seal", accessibilityDescription: "Sigil")?.withSymbolConfiguration(config)
         }
 
         button.action = #selector(handleStatusItemClick(_:))
@@ -63,35 +67,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         button.sendAction(on: [.leftMouseUp, .rightMouseUp])
     }
 
-    // MARK: - Click Handling
-
     @objc private func handleStatusItemClick(_ sender: NSStatusBarButton?) {
         guard let event = NSApp.currentEvent else { return }
         if event.type == .rightMouseUp {
             showRightClickMenu()
         } else {
-            togglePopover()
+            drawer.toggle()
         }
     }
 
     private func showRightClickMenu() {
         let menu = NSMenu()
 
-        let settingsItem = NSMenuItem(
-            title: "Settings…",
-            action: #selector(openSettings),
-            keyEquivalent: ","
-        )
+        let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
         menu.addItem(.separator())
-
-        let quitItem = NSMenuItem(
-            title: "Quit Sigil",
-            action: #selector(NSApplication.terminate(_:)),
-            keyEquivalent: "q"
-        )
-        menu.addItem(quitItem)
+        menu.addItem(NSMenuItem(title: "Quit Sigil", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
@@ -103,7 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     @objc private func openSettings() {
         if settingsWindow == nil {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 480, height: 540),
+                contentRect: NSRect(x: 0, y: 0, width: 480, height: 620),
                 styleMask: [.titled, .closable, .miniaturizable],
                 backing: .buffered,
                 defer: false
@@ -113,64 +105,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             window.contentViewController = NSHostingController(
                 rootView: SettingsView(
                     customPackStore: customPackStore,
-                    iconStore: iconStore
+                    iconStore: iconStore,
+                    drawer: drawer.state,
+                    onShortcutChange: { [weak self] in self?.registerHotKey($0) ?? false }
                 )
             )
             window.center()
             settingsWindow = window
         }
 
-        if popover.isShown { popover.performClose(nil) }
+        drawer.close()
         settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
-
-    // MARK: - Popover
-
-    private func setupPopover() {
-        let contentView = ContentView(
-            iconStore: iconStore,
-            customPackStore: customPackStore,
-            openPacksSettings: { [weak self] in
-                self?.openSettings()
-            }
-        )
-        popover.contentSize = NSSize(width: 400, height: 520)
-        popover.behavior = .transient
-        popover.animates = true
-        popover.contentViewController = NSHostingController(rootView: contentView)
-        popover.delegate = self
-    }
-
-    @objc private func togglePopover() {
-        guard let button = statusItem.button else { return }
-
-        if popover.isShown {
-            popover.performClose(nil)
-        } else {
-            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
-        }
-    }
-
-    // MARK: - Global Event Monitor
-
-    private func setupGlobalEventMonitor() {
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(
-            matching: [.leftMouseDown, .rightMouseDown]
-        ) { [weak self] _ in
-            guard let self, self.popover.isShown else { return }
-            self.popover.performClose(nil)
-        }
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-        }
-    }
-
-    // MARK: - NSPopoverDelegate
-
-    func popoverDidClose(_ notification: Notification) {}
 }

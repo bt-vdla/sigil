@@ -1,12 +1,16 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import ServiceManagement
+import Carbon.HIToolbox
 
 // MARK: - SettingsView
 
 struct SettingsView: View {
     let customPackStore: CustomPackStore
     let iconStore: IconStore
+    let drawer: DrawerState
+    let onShortcutChange: (HotKey.Shortcut) -> Bool
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -16,7 +20,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             // Window header
             HStack(alignment: .firstTextBaseline) {
-                Text("Icon Packs")
+                Text("Settings")
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                 Spacer()
                 Text("v\(appVersion)")
@@ -29,18 +33,21 @@ struct SettingsView: View {
 
             Divider().opacity(0.5)
 
-            PacksSettingsView(customPackStore: customPackStore, iconStore: iconStore)
+            PacksSettingsView(customPackStore: customPackStore, iconStore: iconStore) {
+                GeneralSettingsSection(drawer: drawer, onShortcutChange: onShortcutChange)
+            }
         }
-        .frame(width: 480, height: 540)
+        .frame(width: 480, height: 620)
         .background(.windowBackground)
     }
 }
 
 // MARK: - Packs Settings View
 
-struct PacksSettingsView: View {
+struct PacksSettingsView<Header: View>: View {
     let customPackStore: CustomPackStore
     let iconStore: IconStore
+    @ViewBuilder let header: Header
 
     @State private var showingFolderPicker = false
     @State private var normalizeOnImport = true
@@ -73,6 +80,10 @@ struct PacksSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                header
+
+                Divider()
+                    .padding(.vertical, 10)
 
                 // MARK: Icon Packs — all packs merged, drag-to-reorder
                 sectionHeader("Icon Packs")
@@ -419,16 +430,17 @@ struct PacksSettingsView: View {
         case .normalizing:
             statusRow(spinning: true, text: "Normalizing colors…")
 
-        case .done(let pack):
+        case .done(let pack, let skipped):
+            let skippedNote = skipped > 0 ? ", \(skipped) couldn't be downloaded" : ""
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                     .accessibilityHidden(true)
-                Text("Imported \"\(pack.displayName)\" — \(customPackStore.svgCount(for: pack)) icons")
+                Text("Imported \"\(pack.displayName)\" — \(customPackStore.svgCount(for: pack)) icons\(skippedNote)")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
-            .accessibilityLabel("Import successful. \(pack.displayName) added with \(customPackStore.svgCount(for: pack)) icons.")
+            .accessibilityLabel("Import successful. \(pack.displayName) added with \(customPackStore.svgCount(for: pack)) icons\(skippedNote).")
 
         case .failed(let message):
             HStack(alignment: .top, spacing: 6) {
@@ -547,5 +559,102 @@ private struct RowActionButtonStyle: ButtonStyle {
             .contentShape(Rectangle())
             .onHover { isHovered = $0 }
             .animation(.easeInOut(duration: 0.1), value: isHovered)
+    }
+}
+
+// MARK: - General
+
+struct GeneralSettingsSection: View {
+    let drawer: DrawerState
+    let onShortcutChange: (HotKey.Shortcut) -> Bool
+
+    @State private var shortcut = HotKey.Shortcut.saved
+    @State private var isRecording = false
+    @State private var recordMonitor: Any?
+    @State private var shortcutTaken = false
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("GENERAL")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .tracking(0.5)
+
+            row("Shortcut", detail: shortcutTaken ? "Another app already uses that shortcut." : "Opens and closes Sigil from anywhere.") {
+                Button(isRecording ? "Press keys…" : shortcut.display) {
+                    isRecording ? stopRecording() : startRecording()
+                }
+                .font(.system(size: 12, weight: .medium).monospaced())
+                .frame(minWidth: 96)
+            }
+
+            row("Drawer side", detail: "The screen edge Sigil slides out from.") {
+                Picker("", selection: Binding(get: { drawer.side }, set: { drawer.side = $0 })) {
+                    Text("Left").tag(DrawerSide.left)
+                    Text("Right").tag(DrawerSide.right)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 120)
+            }
+
+            Toggle(isOn: $launchAtLogin) {
+                Text("Open at login").font(.system(size: 12))
+            }
+            .toggleStyle(.checkbox)
+            .onChange(of: launchAtLogin) { _, enabled in
+                try? enabled ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister()
+                launchAtLogin = SMAppService.mainApp.status == .enabled
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .onDisappear(perform: stopRecording)
+    }
+
+    private func row(_ title: String, detail: String, @ViewBuilder control: () -> some View) -> some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.system(size: 12))
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(shortcutTaken && title == "Shortcut" ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
+            }
+            Spacer()
+            control()
+        }
+    }
+
+    /// Next key press with ⌘, ⌥ or ⌃ becomes the shortcut; Esc cancels.
+    private func startRecording() {
+        isRecording = true
+        recordMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            if event.keyCode == UInt16(kVK_Escape) {
+                stopRecording()
+                return nil
+            }
+            let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            guard !modifiers.isDisjoint(with: [.command, .option, .control]) else { return nil }
+
+            let name = event.keyCode == UInt16(kVK_Space) ? "Space" : (event.charactersIgnoringModifiers ?? "?").uppercased()
+            let candidate = HotKey.Shortcut(keyCode: UInt32(event.keyCode), modifiers: modifiers, keyName: name)
+            if onShortcutChange(candidate) {
+                candidate.save()
+                shortcut = candidate
+                shortcutTaken = false
+            } else {
+                _ = onShortcutChange(shortcut)  // keep the old one working
+                shortcutTaken = true
+            }
+            stopRecording()
+            return nil
+        }
+    }
+
+    private func stopRecording() {
+        if let recordMonitor { NSEvent.removeMonitor(recordMonitor) }
+        recordMonitor = nil
+        isRecording = false
     }
 }

@@ -47,10 +47,12 @@ enum PackImporter {
 
     // MARK: - npm via unpkg.com
 
+    typealias Resolved = (files: [(name: String, content: String)], skipped: Int)
+
     static func resolveNPM(
         _ package: String,
         progress: @escaping (Int, Int) -> Void
-    ) async throws -> [(name: String, content: String)] {
+    ) async throws -> Resolved {
         let encoded = package.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? package
         guard let metaURL = URL(string: "https://unpkg.com/\(encoded)@latest/?meta") else {
             throw ImportError.invalidURL
@@ -62,20 +64,32 @@ enum PackImporter {
         }
 
         let meta = try JSONDecoder().decode(UnpkgMeta.self, from: metaData)
-        var svgPaths: [String] = []
-        collectSVGPaths(from: meta, into: &svgPaths)
+        let svgPaths = meta.files.map(\.path).filter { $0.lowercased().hasSuffix(".svg") }
 
         guard !svgPaths.isEmpty else { throw ImportError.noSVGsFound }
 
-        let urls = svgPaths.compactMap { URL(string: "https://unpkg.com/\(encoded)@latest\($0)") }
-        return try await downloadFiles(urls: urls, progress: progress)
+        // Pin the resolved version so each file doesn't redirect through @latest
+        let names = uniqueNames(for: svgPaths)
+        let files = zip(svgPaths, names).compactMap { path, name in
+            URL(string: "https://unpkg.com/\(encoded)@\(meta.version)\(path)").map { (url: $0, name: name) }
+        }
+        return await downloadFiles(files, progress: progress)
     }
 
-    private static func collectSVGPaths(from node: UnpkgMeta, into paths: inout [String]) {
-        if node.type == "file", node.path.lowercased().hasSuffix(".svg") {
-            paths.append(node.path)
+    /// Filenames collide across variant folders (heroicons has 24/outline/x.svg and 24/solid/x.svg).
+    /// Duplicates get their distinguishing folders appended ("x-24-outline") so they sort together.
+    static func uniqueNames(for paths: [String]) -> [String] {
+        let parts = paths.map { $0.split(separator: "/").map(String.init) }
+        guard let first = parts.first else { return [] }
+        let commonDirs = parts.dropFirst().reduce(first.count - 1) { count, p in
+            zip(first.prefix(count), p.dropLast()).prefix { $0 == $1 }.count
         }
-        node.files?.forEach { collectSVGPaths(from: $0, into: &paths) }
+        let bases = parts.map { (($0.last ?? "") as NSString).deletingPathExtension }
+        let counts = Dictionary(bases.map { ($0, 1) }, uniquingKeysWith: +)
+        return zip(parts, bases).map { p, base in
+            guard counts[base, default: 0] > 1 else { return base }
+            return ([base] + p.dropLast().dropFirst(commonDirs)).joined(separator: "-")
+        }
     }
 
     // MARK: - GitHub via Git Trees API (recursive, handles any directory structure)
@@ -86,7 +100,7 @@ enum PackImporter {
         path: String?,
         token: String?,
         progress: @escaping (Int, Int) -> Void
-    ) async throws -> [(name: String, content: String)] {
+    ) async throws -> Resolved {
         // 1 — Get the default branch name
         let branch = try await fetchDefaultBranch(owner: owner, repo: repo, token: token)
 
@@ -106,12 +120,13 @@ enum PackImporter {
 
         // 4 — Download via raw.githubusercontent.com (no auth required, no API rate limits)
         let rawBase = "https://raw.githubusercontent.com/\(owner)/\(repo)/\(branch)/"
-        let urls: [URL] = svgPaths.compactMap { filePath in
+        let names = uniqueNames(for: svgPaths)
+        let files = zip(svgPaths, names).compactMap { filePath, name in
             let encoded = filePath.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? filePath
-            return URL(string: rawBase + encoded)
+            return URL(string: rawBase + encoded).map { (url: $0, name: name) }
         }
 
-        return try await downloadFiles(urls: urls, progress: progress)
+        return await downloadFiles(files, progress: progress)
     }
 
     private static func fetchDefaultBranch(owner: String, repo: String, token: String?) async throws -> String {
@@ -158,7 +173,7 @@ enum PackImporter {
     static func resolveZIP(
         url: URL,
         progress: @escaping (Int, Int) -> Void
-    ) async throws -> [(name: String, content: String)] {
+    ) async throws -> Resolved {
         progress(0, 1)
         let (tempURL, _) = try await URLSession.shared.download(from: url)
         defer { try? FileManager.default.removeItem(at: tempURL) }
@@ -170,77 +185,81 @@ enum PackImporter {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        // -j: junk paths (flatten), -o: overwrite without prompting
-        process.arguments = ["-j", "-o", tempURL.path, "*.svg", "-d", extractDir.path]
+        // Keep folders (variants share filenames); unzip already strips "../" components
+        process.arguments = ["-o", "-q", tempURL.path, "*.svg", "-d", extractDir.path]
         try process.run()
         process.waitUntilExit()
 
-        let svgFiles = (try? FileManager.default.contentsOfDirectory(
-            at: extractDir,
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-        ))?.filter { $0.pathExtension.lowercased() == "svg" } ?? []
+        let root = extractDir.resolvingSymlinksInPath().path + "/"
+        let svgPaths = (FileManager.default.enumerator(at: extractDir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])?
+            .compactMap { ($0 as? URL)?.resolvingSymlinksInPath().path }
+            .filter { $0.lowercased().hasSuffix(".svg") && $0.hasPrefix(root) }
+            .map { String($0.dropFirst(root.count)) }) ?? []
 
-        guard !svgFiles.isEmpty else { throw ImportError.noSVGsFound }
+        guard !svgPaths.isEmpty else { throw ImportError.noSVGsFound }
 
-        let result: [(name: String, content: String)] = svgFiles.compactMap { fileURL in
-            guard let content = try? String(contentsOf: fileURL, encoding: .utf8) else { return nil }
-            return (fileURL.deletingPathExtension().lastPathComponent, content)
+        let files: [(name: String, content: String)] = zip(svgPaths, uniqueNames(for: svgPaths)).compactMap { path, name in
+            guard let content = try? String(contentsOfFile: root + path, encoding: .utf8) else { return nil }
+            return (name, content)
         }
 
         progress(1, 1)
-        return result
+        return (files, svgPaths.count - files.count)
     }
 
     // MARK: - Shared batch downloader
 
+    /// A file that fails to download is counted as skipped instead of aborting the import.
     private static func downloadFiles(
-        urls: [URL],
+        _ files: [(url: URL, name: String)],
         progress: @escaping (Int, Int) -> Void
-    ) async throws -> [(name: String, content: String)] {
-        let total = urls.count
+    ) async -> Resolved {
+        let total = files.count
         var results: [(name: String, content: String)] = []
         results.reserveCapacity(total)
 
         // Concurrency limit: 20 simultaneous downloads
-        try await withThrowingTaskGroup(of: (String, String)?.self) { group in
+        await withTaskGroup(of: (String, String)?.self) { group in
             var inFlight = 0
-            var urlIterator = urls.makeIterator()
+            var fileIterator = files.makeIterator()
             var completed = 0
 
-            while inFlight < 20, let url = urlIterator.next() {
-                group.addTask { try await downloadSingleSVG(url: url) }
+            while inFlight < 20, let file = fileIterator.next() {
+                group.addTask { await downloadSingleSVG(file.url, name: file.name) }
                 inFlight += 1
             }
 
-            for try await result in group {
+            for await result in group {
                 completed += 1
                 progress(completed, total)
                 if let r = result { results.append(r) }
 
-                if let url = urlIterator.next() {
-                    group.addTask { try await downloadSingleSVG(url: url) }
+                if let file = fileIterator.next() {
+                    group.addTask { await downloadSingleSVG(file.url, name: file.name) }
                 }
             }
         }
 
-        return results
+        return (results, total - results.count)
     }
 
-    private static func downloadSingleSVG(url: URL) async throws -> (String, String)? {
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+    private static func downloadSingleSVG(_ url: URL, name: String) async -> (String, String)? {
+        guard let (data, response) = try? await URLSession.shared.data(from: url),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
               let content = String(data: data, encoding: .utf8),
               content.contains("<svg") else { return nil }
-        return (url.deletingPathExtension().lastPathComponent, content)
+        return (name, content)
     }
 
     // MARK: - Response models
 
     struct UnpkgMeta: Decodable {
-        let type: String
+        let version: String
+        let files: [UnpkgFile]
+    }
+
+    struct UnpkgFile: Decodable {
         let path: String
-        let files: [UnpkgMeta]?
     }
 
     struct GitHubRepo: Decodable {

@@ -2,84 +2,81 @@ import SwiftUI
 
 struct IconCellView: View {
     let icon: IconModel
+    let isHighlighted: Bool
     let isSelected: Bool
+    let isFavourite: Bool
+    let iconSize: CGFloat
     let customization: IconCustomization
+    let isInMultiSelection: Bool
+    let selectionCount: Int
     let onTap: (NSEvent.ModifierFlags) -> Void
+    let onHover: () -> Void
+    let onCopy: (OutputFormat) -> Void
+    let onPreview: () -> Void
+    let onToggleFavourite: () -> Void
+    let selectedEffectiveIcons: () -> [IconModel]
 
-    // Passed in so the context menu can act on the full selection when >1 icons are selected
-    let selectedIcons: Set<String>
-    let allVisibleIcons: [IconModel]
-
-    @State private var isHovering = false
     @State private var justCopied = false
     @State private var thumbnail: NSImage?
 
     private var effectiveSVG: String {
-        customization.isCustomized
-            ? customization.apply(to: icon.svgString)
-            : icon.svgString
+        customization.isCustomized ? customization.apply(to: icon.svgString) : icon.svgString
     }
 
-    private var customizationKey: String {
-        guard customization.isCustomized else { return "" }
-        return "|\(customization.color.hexString)|\(customization.strokeWidth)"
+    private var effectiveIcon: IconModel {
+        customization.isCustomized ? icon.withSVG(effectiveSVG) : icon
     }
 
-    /// True when this icon is part of a multi-selection (not just selected alone)
-    private var isInMultiSelection: Bool {
-        isSelected && selectedIcons.count > 1
+    /// currentColor renders black, so those icons are tinted to follow the appearance instead
+    private var followsAppearance: Bool {
+        customization.color == nil && icon.svgString.contains("currentColor")
     }
 
-    /// All currently selected icons, with customization applied
-    private var selectedEffectiveIcons: [IconModel] {
-        allVisibleIcons
-            .filter { selectedIcons.contains($0.id) }
-            .map { icon in
-                guard customization.isCustomized else { return icon }
-                return IconModel(name: icon.name, pack: icon.pack,
-                                 svgString: customization.apply(to: icon.svgString))
-            }
+    private var renderKey: String {
+        let custom = customization.isCustomized ? "|\(customization.color?.hexString ?? "")|\(customization.strokeWidth)" : ""
+        return "\(icon.id)@\(Int(iconSize))\(custom)"
     }
 
     var body: some View {
         iconPreview
-            .frame(width: 44, height: 44)
+            .frame(maxWidth: .infinity)
+            .frame(height: iconSize + 22)
             .background {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(backgroundColor)
             }
             .overlay {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Color.accentColor.opacity(0.8), lineWidth: 1.5)
-                } else if isHovering {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(.primary.opacity(0.1), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(borderColor, lineWidth: isSelected ? 1.5 : 0.5)
+            }
+            .overlay(alignment: .topTrailing) {
+                if isFavourite {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 7))
+                        .foregroundStyle(.yellow.opacity(0.85))
+                        .padding(5)
+                        .accessibilityHidden(true)
                 }
             }
             .overlay(alignment: .top) {
                 if justCopied {
-                    copiedBadge
-                        .transition(.asymmetric(
-                            insertion: .scale(scale: 0.3, anchor: .center).combined(with: .opacity),
-                            removal:   .scale(scale: 0.85, anchor: .center).combined(with: .opacity)
-                        ))
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18, weight: .medium))
+                        .symbolRenderingMode(.multicolor)
+                        .offset(y: -6)
+                        .transition(.scale(scale: 0.3).combined(with: .opacity))
                 }
             }
-            .padding(3)
+            .padding(2)
             .contentShape(Rectangle())
-            .help(icon.name)
-            .onHover { hovering in
-                withAnimation(.easeInOut(duration: 0.1)) { isHovering = hovering }
-            }
+            .onHover { if $0 { onHover() } }
             .onTapGesture {
                 let flags = NSApp.currentEvent?.modifierFlags ?? []
                 onTap(flags)
-                if !flags.contains(.command) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.52)) { justCopied = true }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
-                        withAnimation(.easeOut(duration: 0.18)) { justCopied = false }
-                    }
+                guard !flags.contains(.command) else { return }
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { justCopied = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
+                    withAnimation(.easeOut(duration: 0.18)) { justCopied = false }
                 }
             }
             .contextMenu {
@@ -90,19 +87,23 @@ struct IconCellView: View {
                 }
             }
             .draggable(IconTransferable(icon: effectiveIcon))
-            .task(id: "\(icon.id)\(customizationKey)") {
-                let svg = effectiveSVG
-                let key = "\(icon.id)\(customizationKey)"
-                thumbnail = SVGRenderer.thumbnail(for: key, svgString: svg, size: 32)
+            .task(id: renderKey) {
+                let key = renderKey, svg = effectiveSVG, size = iconSize
+                if let cached = SVGRenderer.cachedThumbnail(for: key) {
+                    thumbnail = cached
+                    return
+                }
+                thumbnail = nil
+                // Render off the main thread so fast scrolling doesn't stutter
+                let image = await Task.detached(priority: .userInitiated) {
+                    SVGRenderer.thumbnail(for: key, svgString: svg, size: size)
+                }.value
+                guard !Task.isCancelled else { return }
+                withAnimation(.easeOut(duration: 0.12)) { thumbnail = image }
             }
-            .accessibilityLabel(icon.name)
+            .accessibilityLabel(isFavourite ? "\(icon.displayName), favourite" : icon.displayName)
             .accessibilityAddTraits(.isButton)
             .accessibilityHint("Copy")
-    }
-
-    private var effectiveIcon: IconModel {
-        guard customization.isCustomized else { return icon }
-        return IconModel(name: icon.name, pack: icon.pack, svgString: effectiveSVG)
     }
 
     // MARK: - Icon Preview
@@ -111,18 +112,25 @@ struct IconCellView: View {
     private var iconPreview: some View {
         if let thumbnail {
             Image(nsImage: thumbnail)
+                .renderingMode(followsAppearance ? .template : .original)
                 .interpolation(.high)
-                .frame(width: 32, height: 32)
+                .foregroundStyle(.primary)
+                .frame(width: iconSize, height: iconSize)
+                .transition(.opacity)
         } else {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(.quaternary.opacity(0.3))
-                .frame(width: 32, height: 32)
+            Color.clear.frame(width: iconSize, height: iconSize)
         }
     }
 
     private var backgroundColor: Color {
-        if isSelected { return Color.accentColor.opacity(0.14) }
-        if isHovering { return .primary.opacity(0.06) }
+        if isSelected { return Color.accentColor.opacity(0.18) }
+        if isHighlighted { return .white.opacity(0.1) }
+        return .clear
+    }
+
+    private var borderColor: Color {
+        if isSelected { return Color.accentColor.opacity(0.85) }
+        if isHighlighted { return .white.opacity(0.16) }
         return .clear
     }
 
@@ -130,85 +138,58 @@ struct IconCellView: View {
 
     @ViewBuilder
     private var singleSelectionMenuItems: some View {
-        // Icon name as non-interactive header
         Text(icon.name)
-            .font(.system(size: 12, weight: .semibold))
 
         Divider()
 
-        Button {
-            CopyService.copySVGCode(icon: effectiveIcon)
-        } label: {
-            Label("Copy SVG Code", systemImage: "doc.text")
-        }
-
-        Button {
-            CopyService.copyAsPNG(icon: effectiveIcon)
-        } label: {
-            Label("Copy as PNG", systemImage: "photo")
-        }
-
-        Button {
-            CopyService.copyAsReactComponent(icon: effectiveIcon)
-        } label: {
-            Label("Copy as React Component", systemImage: "chevron.left.forwardslash.chevron.right")
+        ForEach(OutputFormat.allCases.filter { $0.isAvailable(for: icon) }) { format in
+            Button {
+                onCopy(format)
+            } label: {
+                Label("Copy \(format.label(for: icon))", systemImage: format.symbol)
+            }
         }
 
         Divider()
 
-        Button {
-            CopyService.copyFile(icon: effectiveIcon)
-        } label: {
-            Label("Copy File", systemImage: "doc.on.doc")
+        Button(action: onPreview) {
+            Label("Preview", systemImage: "eye")
+        }
+        Button(action: onToggleFavourite) {
+            Label(isFavourite ? "Remove from Favourites" : "Add to Favourites", systemImage: isFavourite ? "star.slash" : "star")
         }
 
         Divider()
 
         Text("Pack: \(icon.pack.displayName)")
-            .font(.caption)
     }
 
     // MARK: - Context Menu: Multi-selection
 
     @ViewBuilder
     private var multiSelectionMenuItems: some View {
-        Text("\(selectedIcons.count) icons selected")
-            .font(.system(size: 11, weight: .semibold))
+        Text("\(selectionCount) icons selected")
 
         Divider()
 
         Button {
-            CopyService.bulkCopyFiles(icons: selectedEffectiveIcons)
+            CopyService.bulkCopyFiles(icons: selectedEffectiveIcons())
         } label: {
-            Label("Copy All \(selectedIcons.count) Files", systemImage: "doc.on.doc.fill")
+            Label("Copy All \(selectionCount) Files", systemImage: "doc.on.doc.fill")
         }
 
         Button {
-            CopyService.bulkCopySVGCode(icons: selectedEffectiveIcons)
+            CopyService.bulkCopySVGCode(icons: selectedEffectiveIcons())
         } label: {
             Label("Copy All as SVG Code", systemImage: "doc.text")
         }
 
         Divider()
 
-        Menu {
-            Button {
-                CopyService.bulkExportAndReveal(icons: selectedEffectiveIcons)
-            } label: {
-                Label("Export \(selectedIcons.count) Files to Folder…", systemImage: "folder")
-            }
+        Button {
+            CopyService.bulkExportAndReveal(icons: selectedEffectiveIcons())
         } label: {
-            Label("More…", systemImage: "ellipsis")
+            Label("Export \(selectionCount) Files to Folder…", systemImage: "folder")
         }
-    }
-
-    // MARK: - Copied Badge
-
-    private var copiedBadge: some View {
-        Image(systemName: "checkmark.circle.fill")
-            .font(.system(size: 20, weight: .medium))
-            .symbolRenderingMode(.multicolor)
-            .symbolEffect(.bounce, value: justCopied)
-            .offset(y: -8)
     }
 }

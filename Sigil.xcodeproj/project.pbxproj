@@ -13,6 +13,7 @@
 		29548F807A95D2EDDB55E390 /* PackFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83041820D6F0DFAEC9DD74D4 /* PackFilterBar.swift */; };
 		325CAC0232723E3C366A8CB8 /* CustomizationBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3AB8285CC97536364ACBC2 /* CustomizationBar.swift */; };
 		4FDADF207A3FF2B5E2712703 /* IconPack.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC044E695A849F0AEADEF6B /* IconPack.swift */; };
+		52CC718E7E2C2A9F23407958 /* tags.json in Resources */ = {isa = PBXBuildFile; fileRef = ACE84E01FCB6A1490225D844 /* tags.json */; };
 		573A094111CB456C68FD1ED5 /* CopyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDBD46C88F4B3747F3A6E730 /* CopyService.swift */; };
 		59A4B65F04FA06C5724694A8 /* IconGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A029A04AC323A8FBC4665C7F /* IconGridView.swift */; };
 		5A81DB54A61391E3713E592C /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E5CF1BAB98495028A0106B /* AppDelegate.swift */; };
@@ -20,17 +21,25 @@
 		72AD2A5EF684211BD26C748C /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A200B38664317F39F101720 /* SettingsView.swift */; };
 		788D3663D9E7EC8D447220C4 /* SearchBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1C31FECE16B8EEC4985B7D /* SearchBarView.swift */; };
 		8DEC5234435F045DE163F445 /* CustomPackStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D48432E6AA72EA364DB270ED /* CustomPackStore.swift */; };
+		90CB5430CC53A5E8E12AB2B4 /* OutputFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F1F7C42E6CC72544078246A /* OutputFormat.swift */; };
 		959D6A0C578DDBBA24826B08 /* IconCustomization.swift in Sources */ = {isa = PBXBuildFile; fileRef = F60011DEB2FB6124D9194804 /* IconCustomization.swift */; };
+		AD8D7AC7F9C9087080D2371E /* DrawerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 885F52BE15E9FF848DD92256 /* DrawerView.swift */; };
 		AEAB141EDC9D49000324BAB1 /* SVGRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89CCEDC231536A70996FAF31 /* SVGRenderer.swift */; };
 		B3F85E0A0DE4F5A653BF597B /* IconStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80BEF04244AD97CB76F9C368 /* IconStore.swift */; };
+		BCF9D6A7A99F55DE480CB7A3 /* IconDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BBF4379D7969070D79D8149 /* IconDetailViews.swift */; };
 		C3160635C483E514017D9D1E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 498D4BC24BD7147B6C095840 /* Assets.xcassets */; };
 		CD9BB099DD47CE1D1FAF2B6A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39EFB8419DBC83F313DA1A36 /* ContentView.swift */; };
 		D4BB42A7F4F5E253A5E845F3 /* BulkActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6109B8C13F1D6E6B8CE0A105 /* BulkActionBar.swift */; };
+		F34CC5516FD62515E8397F22 /* IconShelf.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09CB177E25985F3A3EEA8C75 /* IconShelf.swift */; };
+		F3BDA754A219A07F84066687 /* Drawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0DC1FF5FA07E7B712D339E /* Drawer.swift */; };
 		F796A2106D3F0DC725B1ED0E /* IconTransferable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E1E4F71B672A8E07666B7E8 /* IconTransferable.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0492B6DE4BD6621FF98EABB8 /* IconModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconModel.swift; sourceTree = "<group>"; };
+		09CB177E25985F3A3EEA8C75 /* IconShelf.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconShelf.swift; sourceTree = "<group>"; };
+		0F1F7C42E6CC72544078246A /* OutputFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputFormat.swift; sourceTree = "<group>"; };
+		1A0DC1FF5FA07E7B712D339E /* Drawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Drawer.swift; sourceTree = "<group>"; };
 		1A200B38664317F39F101720 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		1A3AB8285CC97536364ACBC2 /* CustomizationBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizationBar.swift; sourceTree = "<group>"; };
 		39EFB8419DBC83F313DA1A36 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -43,9 +52,12 @@
 		78DE514220A3A2383C0CABFC /* IconCellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconCellView.swift; sourceTree = "<group>"; };
 		80BEF04244AD97CB76F9C368 /* IconStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconStore.swift; sourceTree = "<group>"; };
 		83041820D6F0DFAEC9DD74D4 /* PackFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackFilterBar.swift; sourceTree = "<group>"; };
+		885F52BE15E9FF848DD92256 /* DrawerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrawerView.swift; sourceTree = "<group>"; };
 		89CCEDC231536A70996FAF31 /* SVGRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SVGRenderer.swift; sourceTree = "<group>"; };
+		9BBF4379D7969070D79D8149 /* IconDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconDetailViews.swift; sourceTree = "<group>"; };
 		A029A04AC323A8FBC4665C7F /* IconGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IconGridView.swift; sourceTree = "<group>"; };
 		A0CE86189EA692B112EE455F /* PackImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackImporter.swift; sourceTree = "<group>"; };
+		ACE84E01FCB6A1490225D844 /* tags.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = tags.json; sourceTree = "<group>"; };
 		CC1C31FECE16B8EEC4985B7D /* SearchBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchBarView.swift; sourceTree = "<group>"; };
 		CDBD46C88F4B3747F3A6E730 /* CopyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyService.swift; sourceTree = "<group>"; };
 		D48432E6AA72EA364DB270ED /* CustomPackStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomPackStore.swift; sourceTree = "<group>"; };
@@ -60,7 +72,9 @@
 			children = (
 				CDBD46C88F4B3747F3A6E730 /* CopyService.swift */,
 				D48432E6AA72EA364DB270ED /* CustomPackStore.swift */,
+				09CB177E25985F3A3EEA8C75 /* IconShelf.swift */,
 				80BEF04244AD97CB76F9C368 /* IconStore.swift */,
+				0F1F7C42E6CC72544078246A /* OutputFormat.swift */,
 				A0CE86189EA692B112EE455F /* PackImporter.swift */,
 			);
 			path = Services;
@@ -92,6 +106,7 @@
 		55B17CF94CDCD89DCFEFB54A /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				ACE84E01FCB6A1490225D844 /* tags.json */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -121,7 +136,9 @@
 				6109B8C13F1D6E6B8CE0A105 /* BulkActionBar.swift */,
 				39EFB8419DBC83F313DA1A36 /* ContentView.swift */,
 				1A3AB8285CC97536364ACBC2 /* CustomizationBar.swift */,
+				885F52BE15E9FF848DD92256 /* DrawerView.swift */,
 				78DE514220A3A2383C0CABFC /* IconCellView.swift */,
+				9BBF4379D7969070D79D8149 /* IconDetailViews.swift */,
 				A029A04AC323A8FBC4665C7F /* IconGridView.swift */,
 				83041820D6F0DFAEC9DD74D4 /* PackFilterBar.swift */,
 				CC1C31FECE16B8EEC4985B7D /* SearchBarView.swift */,
@@ -142,6 +159,7 @@
 			isa = PBXGroup;
 			children = (
 				44E5CF1BAB98495028A0106B /* AppDelegate.swift */,
+				1A0DC1FF5FA07E7B712D339E /* Drawer.swift */,
 				3B24E0DAB90A302402EAFE10 /* SigilApp.swift */,
 			);
 			path = App;
@@ -203,6 +221,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C3160635C483E514017D9D1E /* Assets.xcassets in Resources */,
+				52CC718E7E2C2A9F23407958 /* tags.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -241,13 +260,18 @@
 				573A094111CB456C68FD1ED5 /* CopyService.swift in Sources */,
 				8DEC5234435F045DE163F445 /* CustomPackStore.swift in Sources */,
 				325CAC0232723E3C366A8CB8 /* CustomizationBar.swift in Sources */,
+				F3BDA754A219A07F84066687 /* Drawer.swift in Sources */,
+				AD8D7AC7F9C9087080D2371E /* DrawerView.swift in Sources */,
 				0B2D00195089893191D74D16 /* IconCellView.swift in Sources */,
 				959D6A0C578DDBBA24826B08 /* IconCustomization.swift in Sources */,
+				BCF9D6A7A99F55DE480CB7A3 /* IconDetailViews.swift in Sources */,
 				59A4B65F04FA06C5724694A8 /* IconGridView.swift in Sources */,
 				097EB0C519B0BCA20A69260B /* IconModel.swift in Sources */,
 				4FDADF207A3FF2B5E2712703 /* IconPack.swift in Sources */,
+				F34CC5516FD62515E8397F22 /* IconShelf.swift in Sources */,
 				B3F85E0A0DE4F5A653BF597B /* IconStore.swift in Sources */,
 				F796A2106D3F0DC725B1ED0E /* IconTransferable.swift in Sources */,
+				90CB5430CC53A5E8E12AB2B4 /* OutputFormat.swift in Sources */,
 				29548F807A95D2EDDB55E390 /* PackFilterBar.swift in Sources */,
 				291FA90D29D2E1298773F369 /* PackImporter.swift in Sources */,
 				AEAB141EDC9D49000324BAB1 /* SVGRenderer.swift in Sources */,

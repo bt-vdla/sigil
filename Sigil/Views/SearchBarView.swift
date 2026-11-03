@@ -2,25 +2,25 @@ import SwiftUI
 
 struct SearchBarView: View {
     @Binding var text: String
-    @FocusState private var isFocused: Bool
+    var isFocused: FocusState<Bool>.Binding
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.tertiary)
 
-            TextField("Search icons…", text: $text)
+            TextField("Search icons", text: $text)
                 .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .focused($isFocused)
+                .font(.system(size: 14))
+                .focused(isFocused)
 
             if !text.isEmpty {
                 Button {
                     text = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
@@ -28,22 +28,10 @@ struct SearchBarView: View {
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(.quinary)
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .strokeBorder(.separator.opacity(0.5), lineWidth: 0.5)
-        }
-        .onAppear {
-            // Auto-focus when popover opens
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                isFocused = true
-            }
-        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Capsule(style: .continuous).fill(.white.opacity(0.08)))
+        .overlay(Capsule(style: .continuous).strokeBorder(.white.opacity(0.08), lineWidth: 0.5))
         .animation(.easeInOut(duration: 0.15), value: text.isEmpty)
     }
 }

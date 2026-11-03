@@ -1,50 +1,72 @@
 import SwiftUI
 
+/// Pack chips. Several can be on at once; none means all packs. The choice persists,
+/// so it doubles as the user's default packs.
 struct PackFilterBar: View {
-    @Binding var selectedPack: IconPack?
+    @Binding var selectedPacks: Set<String>
     let allPacks: [IconPack]
     let packCounts: [IconPack: Int]
     var onAddPack: (() -> Void)? = nil
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                FilterChip(
-                    label: "All",
-                    count: packCounts.values.reduce(0, +),
-                    isSelected: selectedPack == nil,
-                    accentColor: .primary
-                ) {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        selectedPack = nil
-                    }
-                }
-
-                ForEach(allPacks) { pack in
+        HStack(spacing: 6) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
                     FilterChip(
-                        label: pack.displayName,
-                        count: packCounts[pack] ?? 0,
-                        isSelected: selectedPack == pack,
-                        accentColor: Color(hex: pack.accentHex)
+                        label: "All",
+                        count: packCounts.values.reduce(0, +),
+                        isSelected: selectedPacks.isEmpty,
+                        accentColor: .primary
                     ) {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            selectedPack = selectedPack == pack ? nil : pack
+                        selectedPacks = []
+                    }
+
+                    ForEach(allPacks) { pack in
+                        FilterChip(
+                            label: pack.displayName,
+                            count: packCounts[pack] ?? 0,
+                            isSelected: selectedPacks.contains(pack.id),
+                            accentColor: Color(hex: pack.accentHex)
+                        ) {
+                            if selectedPacks.contains(pack.id) {
+                                selectedPacks.remove(pack.id)
+                            } else {
+                                selectedPacks.insert(pack.id)
+                            }
                         }
                     }
-                }
 
-                if let onAddPack {
-                    Button(action: onAddPack) {
-                        Image(systemName: "plus.circle")
-                            .font(.system(size: 13, weight: .light))
-                            .foregroundStyle(.quaternary)
+                    if let onAddPack {
+                        Button(action: onAddPack) {
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 13, weight: .light))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.leading, 2)
+                        .help("Add icon pack")
+                        .accessibilityLabel("Add icon pack")
                     }
-                    .buttonStyle(.plain)
-                    .padding(.leading, 2)
-                    .help("Add icon pack")
                 }
             }
+
+            if !selectedPacks.isEmpty {
+                Button {
+                    selectedPacks = []
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 20, height: 20)
+                        .background(Circle().fill(.white.opacity(0.1)))
+                }
+                .buttonStyle(.plain)
+                .help("Clear pack filter (⌘0)")
+                .accessibilityLabel("Clear pack filter")
+                .transition(.scale(scale: 0.6).combined(with: .opacity))
+            }
         }
+        .animation(.spring(response: 0.28, dampingFraction: 0.8), value: selectedPacks)
     }
 }
 
@@ -73,18 +95,18 @@ private struct FilterChip: View {
             .padding(.vertical, 4)
             .background {
                 Capsule(style: .continuous)
-                    .fill(isSelected ? accentColor.opacity(0.15) : .primary.opacity(0.04))
+                    .fill(isSelected ? accentColor.opacity(0.18) : .primary.opacity(0.05))
             }
             .overlay {
                 if isSelected {
                     Capsule(style: .continuous)
-                        .strokeBorder(accentColor.opacity(0.45), lineWidth: 0.5)
+                        .strokeBorder(accentColor.opacity(0.5), lineWidth: 0.5)
                 }
             }
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .foregroundStyle(isSelected ? AnyShapeStyle(accentColor) : AnyShapeStyle(.tertiary))
+        .foregroundStyle(isSelected ? AnyShapeStyle(accentColor) : AnyShapeStyle(.secondary))
         .accessibilityLabel("\(label)\(count > 0 ? ", \(count) icons" : "")\(isSelected ? ", selected" : "")")
     }
 }

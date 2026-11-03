@@ -157,18 +157,18 @@ final class CustomPackStore {
         do {
             try fileManager.createDirectory(at: destDir, withIntermediateDirectories: true)
 
-            let svgFiles: [(name: String, content: String)]
+            let resolved: PackImporter.Resolved
             let displayName: String
 
             switch PackImporter.detectSource(input) {
             case .npm(let package):
-                svgFiles = try await PackImporter.resolveNPM(package) { current, total in
+                resolved = try await PackImporter.resolveNPM(package) { current, total in
                     Task { @MainActor in self.importProgress = .downloading(current: current, total: total) }
                 }
                 displayName = Self.displayNameFromInput(input)
 
             case .github(let owner, let repo, let path):
-                svgFiles = try await PackImporter.resolveGitHub(
+                resolved = try await PackImporter.resolveGitHub(
                     owner: owner, repo: repo, path: path,
                     token: githubToken.isEmpty ? nil : githubToken
                 ) { current, total in
@@ -177,7 +177,7 @@ final class CustomPackStore {
                 displayName = repo
 
             case .zipURL(let url):
-                svgFiles = try await PackImporter.resolveZIP(url: url) { current, total in
+                resolved = try await PackImporter.resolveZIP(url: url) { current, total in
                     Task { @MainActor in self.importProgress = .downloading(current: current, total: total) }
                 }
                 displayName = Self.displayNameFromInput(input)
@@ -190,6 +190,7 @@ final class CustomPackStore {
                 return
             }
 
+            let svgFiles = resolved.files
             guard !svgFiles.isEmpty else {
                 try? fileManager.removeItem(at: destDir)
                 await MainActor.run { importProgress = .failed("No SVG icons found at this source.") }
@@ -212,7 +213,7 @@ final class CustomPackStore {
             await MainActor.run {
                 packs.append(pack)
                 appendToOrder(pack.id)
-                importProgress = .done(pack)
+                importProgress = .done(pack, skipped: resolved.skipped)
                 onPackAdded?(pack)
             }
 
@@ -350,7 +351,7 @@ final class CustomPackStore {
         case resolving
         case downloading(current: Int, total: Int)
         case normalizing
-        case done(IconPack)
+        case done(IconPack, skipped: Int)
         case failed(String)
     }
 

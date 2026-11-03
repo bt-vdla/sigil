@@ -4,6 +4,7 @@ import AppKit
 struct CustomizationBar: View {
     @Bindable var customization: IconCustomization
     @State private var isExpanded = false
+    @State private var colorObserver: NSObjectProtocol?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -119,11 +120,10 @@ struct CustomizationBar: View {
     }
 
     private func swatchButton(color: Color, name: String) -> some View {
-        let isActive = customization.color.hexString == color.hexString && customization.isCustomized
+        let isActive = customization.color?.hexString == color.hexString
 
         return Button {
             customization.color = color
-            customization.isCustomized = true
         } label: {
             Circle()
                 .fill(color)
@@ -151,9 +151,6 @@ struct CustomizationBar: View {
 
             Slider(value: $customization.strokeWidth, in: 0.5...4.0, step: 0.5)
                 .controlSize(.mini)
-                .onChange(of: customization.strokeWidth) { _, _ in
-                    customization.isCustomized = true
-                }
                 .accessibilityLabel("Stroke width")
 
             Text(String(format: "%.1f", customization.strokeWidth))
@@ -173,7 +170,8 @@ struct CustomizationBar: View {
         panel.setAction(nil)
         panel.makeKeyAndOrderFront(nil)
 
-        NotificationCenter.default.addObserver(
+        if let colorObserver { NotificationCenter.default.removeObserver(colorObserver) }
+        colorObserver = NotificationCenter.default.addObserver(
             forName: NSColorPanel.colorDidChangeNotification,
             object: panel,
             queue: .main
@@ -181,7 +179,6 @@ struct CustomizationBar: View {
             guard let nsColor = panel?.color,
                   let srgb = nsColor.usingColorSpace(.sRGB) else { return }
             customization.color = Color(nsColor: srgb)
-            customization.isCustomized = true
         }
     }
 }
